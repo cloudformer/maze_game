@@ -8,6 +8,7 @@ import mazegen
 import game
 import db
 import config
+import menu
 
 
 def read_size(args):
@@ -65,12 +66,15 @@ def main():
     # sys.argv 是命令行里敲的一串词:['main.py', 'gen', '15', '15']
     args = sys.argv[1:]  # 去掉第一个(文件名本身)
 
-    if len(args) >= 1 and args[0] == "gen":
+    if len(args) == 0:
+        menu.run()          # 直接 python main.py 就进开始菜单(FC 风格)
+    elif args[0] == "gen":
         do_gen(args)
-    elif len(args) >= 1 and args[0] == "play":
+    elif args[0] == "play":
         do_play(args)
     else:
         print("用法:")
+        print("  python main.py              打开开始菜单(选模式/选地图/玩)")
         print("  python main.py gen [宽 高]    生成一张迷宫并存进数据库")
         print("  python main.py gen all       按关卡表生成 9 关默认地图")
         print("  python main.py play 编号      玩指定编号的地图")

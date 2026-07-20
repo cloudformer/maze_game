@@ -100,4 +100,6 @@ def play(grid):
                     clear_screen()
                     draw(grid, player_x, player_y)
                     print("\n🎉 通关!你一共走了 " + str(steps) + " 步。")
+                    print("按任意键返回菜单…")
+                    read_key()   # 停一下,让你看清成绩,再回菜单
                     return
