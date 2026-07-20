@@ -7,6 +7,7 @@ import sys
 import mazegen
 import game
 import db
+import config
 
 
 def read_size(args):
@@ -20,7 +21,11 @@ def read_size(args):
 
 
 def do_gen(args):
-    """生成一张迷宫,存进数据库,并打印出来。gen 只负责"生成 + 存",不玩。"""
+    """生成一张迷宫,存进数据库,并打印出来。gen 只负责"生成 + 存",不玩。
+    特例:gen all —— 按关卡表(config.MAP_SIZES)把 9 关默认地图都生成一遍。"""
+    if len(args) >= 2 and args[1] == "all":
+        gen_all()
+        return
     width, height = read_size(args)
     grid = mazegen.generate(width, height)
     map_id = db.save_map(width, height, grid)   # 存进 maps 表,拿到编号
@@ -28,6 +33,16 @@ def do_gen(args):
     for row in grid:
         print("".join(row))
     print("玩它:python main.py play " + str(map_id))
+
+
+def gen_all():
+    """按关卡表把 9 关默认地图都生成并存库,只打印每关存成了几号。"""
+    for level in sorted(config.MAP_SIZES):        # 关卡编号 1~9,从小到大
+        size = config.MAP_SIZES[level]
+        grid = mazegen.generate(size, size)
+        map_id = db.save_map(size, size, grid)
+        print("关卡 %d(%dx%d)-> 已存为地图 #%d" % (level, size, size, map_id))
+    print("完成:9 关默认地图都生成好了。用 python main.py play 编号 开玩")
 
 
 def do_play(args):
@@ -57,6 +72,7 @@ def main():
     else:
         print("用法:")
         print("  python main.py gen [宽 高]    生成一张迷宫并存进数据库")
+        print("  python main.py gen all       按关卡表生成 9 关默认地图")
         print("  python main.py play 编号      玩指定编号的地图")
 
 
