@@ -1,16 +1,17 @@
-# game.py —— 手动玩:在迷宫里放一个小人 '*',用 W/A/S/D 移动
+# game.py —— 手动玩:在迷宫里放一个小人,用 W/A/S/D 移动
 #
 # 最重要的设计(你特别要求的):走路不改地图。
 #   - 地图 grid 是"只读底图",全程一个字都不改;
 #   - 小人的位置只用两个数字 player_x, player_y 记着;
-#   - 每次显示 = 底图照抄一遍,只在小人那一格盖上 '*'。
-# 这样小人走到哪 '*' 就显示到哪,底下的墙和路永远不变。
+#   - 每次显示 = 底图照抄一遍,只在小人那一格盖上小人符号。
+# 这样小人走到哪就显示到哪,底下的墙和路永远不变。
 
 import os
-import mazegen
+import config  # 墙/出口/小人 的样子都在 config.py 里
 
-WALL = "#"
-EXIT = "E"
+WALL = config.WALL
+EXIT = config.EXIT
+PLAYER = config.PLAYER
 
 # W/A/S/D 对应的走法(x=列, y=行)
 # w=上 y-1;s=下 y+1;a=左 x-1;d=右 x+1
@@ -28,17 +29,17 @@ def clear_screen():
 
 
 def draw(grid, player_x, player_y):
-    """把地图打印出来,并在 (player_x, player_y) 那格盖一个 '*'。
+    """把地图打印出来,并在 (player_x, player_y) 那格盖上小人。
     关键:这里对 grid 只读不改——把每一行复制一份再改副本,原地图不动。"""
     for y in range(len(grid)):
         row = list(grid[y])          # 复制这一行(改副本,不动原地图)
         if y == player_y:
-            row[player_x] = "*"      # 只在小人这一格盖上星号
-        print("".join(row))
+            row[player_x] = PLAYER   # 只在小人这一格盖上小人符号
+        print("".join(row))          # 每格本来就是 2 字符宽,拼起来就是正方形
 
 
 def find_exit(grid):
-    """在地图里找到出口 'E' 的坐标 (x, y)。"""
+    """在地图里找到出口的坐标 (x, y)。"""
     for y in range(len(grid)):
         for x in range(len(grid[y])):
             if grid[y][x] == EXIT:
@@ -46,13 +47,12 @@ def find_exit(grid):
     return None
 
 
-def play(text):
-    """在一张迷宫(字符画 text)里走小人,走到出口 E 就通关。"""
-    grid = mazegen.parse(text)       # 只读底图
-    exit_x, exit_y = find_exit(grid) # 出口在哪
-    player_x = 1                     # 小人起点:左上角那格路
+def play(grid):
+    """在一张迷宫(二维表 grid)里走小人,走到出口就通关。"""
+    exit_x, exit_y = find_exit(grid)  # 出口在哪
+    player_x = 1                      # 小人起点:左上角那格路
     player_y = 1
-    steps = 0                        # 走了多少步
+    steps = 0                         # 走了多少步
 
     while True:
         clear_screen()
