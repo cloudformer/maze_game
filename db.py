@@ -119,6 +119,50 @@ def get_map(map_id):
     return grid_list
 
 
+def get_or_create_player(name):
+    """按名字找玩家,没有就新建一个。返回玩家的 id。
+    (这样同一个名字永远对应同一个玩家,战绩能累计。)"""
+    session = Session()
+    player = session.query(Player).filter_by(name=name).first()
+    if player is None:
+        player = Player(name=name)
+        session.add(player)
+        session.commit()
+    player_id = player.id
+    session.close()
+    return player_id
+
+
+def save_play(player_id, map_id, steps, success):
+    """存一局成绩到 plays(交易)表:谁、哪张图、多少步、成功与否。
+    时间由数据库自动记(created_at 默认当前时间)。"""
+    session = Session()
+    play = Play(player_id=player_id, map_id=map_id,
+                steps=steps, success=1 if success else 0)
+    session.add(play)
+    session.commit()
+    session.close()
+
+
+def leaderboard():
+    """读排行榜:所有【通关】的记录,按 地图编号、再按 步数(少的在前)排好。
+    返回一串字典,每条含 地图编号 / 名字 / 步数 / 时间。"""
+    session = Session()
+    rows = []
+    query = (session.query(Play)
+             .filter(Play.success == 1)
+             .order_by(Play.map_id, Play.steps))
+    for play in query.all():
+        rows.append({
+            "map_id": play.map_id,
+            "name": play.player.name,   # 通过外键关联直接拿到名字
+            "steps": play.steps,
+            "time": play.created_at,
+        })
+    session.close()
+    return rows
+
+
 def init_db():
     """建表:把上面三张表在数据库文件里创建出来(已存在的表不会动)。
     每次程序启动调一次很安全,重复调不会重建、也不会丢数据。"""
