@@ -8,10 +8,14 @@
 
 import os
 import sys
+import time
 import config  # 墙/出口/小人图标 都在 config.py 里
 
 WALL = config.WALL
 EXIT = config.EXIT
+
+# bot 用的四个方向 -> 走法 (dx, dy)。'U'上 'D'下 'L'左 'R'右。
+MOVES = {"U": (0, -1), "D": (0, 1), "L": (-1, 0), "R": (1, 0)}
 
 # 控制方案清单:第 i 个玩家用第 i 套键。想加第 4 个人就再加一套。
 # 走法 (dx, dy):x=列 y=行;上 y-1、下 y+1、左 x-1、右 x+1。
@@ -88,6 +92,35 @@ def find_exit(grid):
     return None
 
 
+# ---- 下面这几件事全是"游戏"的责任:知道哪里是墙、能不能走、怎么走一步。----
+# 人类和 bot 都用这几个函数,bot 只负责"说一个方向",绝不自己碰地图。
+
+def is_wall(grid, x, y):
+    """(x, y) 那格是不是墙?"""
+    return grid[y][x] == WALL
+
+
+def look(grid, x, y):
+    """站在 (x, y) 看四邻:返回 {'U':是不是墙, 'D':..., 'L':..., 'R':...}。
+    这就是递给 bot 的"小抄"——bot 靠它决定往哪走,不用去撞。"""
+    walls = {}
+    for direction in MOVES:
+        dx, dy = MOVES[direction]
+        walls[direction] = is_wall(grid, x + dx, y + dy)
+    return walls
+
+
+def try_step(grid, x, y, dx, dy):
+    """从 (x, y) 往 (dx, dy) 走一步:
+    是路就返回 (新x, 新y, True);是墙就原地不动、返回 (x, y, False)。
+    撞墙的判断只在这一个地方做,人类和 bot 共用。"""
+    nx = x + dx
+    ny = y + dy
+    if is_wall(grid, nx, ny):
+        return (x, y, False)
+    return (nx, ny, True)
+
+
 def draw(grid, players):
     """打印地图,并把每个小人叠在自己的位置上。
     对 grid 只读不改:每行复制一份再改副本,原地图不动。
@@ -127,14 +160,51 @@ def play(grid, players):
         for player in players:
             if key in player["keys"]:
                 dx, dy = player["keys"][key]
-                target_x = player["x"] + dx
-                target_y = player["y"] + dy
-                if grid[target_y][target_x] != WALL:   # 撞墙不动
-                    player["x"] = target_x
-                    player["y"] = target_y
+                # 走一步交给游戏的 try_step 判断(撞墙不动)
+                nx, ny, moved = try_step(grid, player["x"], player["y"], dx, dy)
+                if moved:
+                    player["x"] = nx
+                    player["y"] = ny
                     player["steps"] = player["steps"] + 1
-                    if (player["x"], player["y"]) == exit_pos:
+                    if (nx, ny) == exit_pos:
                         clear_screen()
                         draw(grid, players)
                         return player          # 这个玩家先到,赢了
                 break
+
+
+def watch_bot(grid, bot, delay, max_steps):
+    """看一个 bot 自己走迷宫(动画)。走到出口返回步数;走太多步还没出去返回 None。
+    分工:游戏负责 look(给四邻)、try_step(判断墙、走一步)、画面、位置、计步;
+          bot 只负责 next_move —— 说一个方向。bot 从头到尾不碰地图。"""
+    exit_pos = find_exit(grid)
+    x = 1                       # bot 位置由游戏管着
+    y = 1
+    steps = 0
+    bot_player = {"symbol": fit2(bot.symbol), "x": x, "y": y}  # 复用 draw 来画 bot
+
+    while steps < max_steps:
+        clear_screen()
+        bot_player["x"] = x
+        bot_player["y"] = y
+        draw(grid, [bot_player])
+        print("\n%s(作者:%s)自己在走…  第 %d 步" % (bot.name, bot.author, steps))
+        time.sleep(delay)                       # 停一下,才看得见动画
+
+        walls = look(grid, x, y)                 # 游戏把四邻小抄递给 bot
+        move = bot.next_move((x, y), walls)      # bot 只说一个方向
+        dx, dy = MOVES[move]
+        x, y, moved = try_step(grid, x, y, dx, dy)  # 游戏判断能不能走、走一步
+        if moved:
+            steps = steps + 1
+            if (x, y) == exit_pos:
+                clear_screen()
+                bot_player["x"] = x
+                bot_player["y"] = y
+                draw(grid, [bot_player])
+                print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, steps))
+                return steps
+
+    # 步数用完还没出去(RandomBot 太笨时会这样)
+    print("\n😵 %s 走了 %d 步还没出去(超步数上限)。" % (bot.name, steps))
+    return None

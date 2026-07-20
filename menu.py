@@ -3,6 +3,8 @@
 
 import game
 import db
+import bots
+import config
 
 
 def list_maps():
@@ -61,6 +63,20 @@ def single_game():
         record_win(map_id, winner["steps"], "输入你的名字记录成绩:")
 
 
+def watch_bot_game():
+    """看 bot 跑:选一张图,让 RandomBot 自己走(动画)。"""
+    map_id = choose_map()
+    if map_id is None:
+        return
+    grid = db.get_map(map_id)
+    bot = bots.RandomBot()
+    # 步数上限 = 格子数 × 5,防止笨 bot 一直绕圈卡死
+    max_steps = len(grid) * len(grid[0]) * 5
+    game.watch_bot(grid, bot, config.BOT_STEP_DELAY, max_steps)
+    print("\n按任意键返回菜单…")
+    game.read_key()
+
+
 def show_leaderboard():
     """排行榜:读 plays(交易)表,按地图分组、步数从少到多列出来。"""
     game.clear_screen()
@@ -104,7 +120,8 @@ def run():
         print("==============================\n")
         print("   1    Single      单人闯关")
         print("   2    VS Mode     双人对战")
-        print("   3    Leaderboard 排行榜")
+        print("   3    Watch Bot   看机器人跑")
+        print("   4    Leaderboard 排行榜")
         print("   Q    退出\n")
         print("请按键选择:")
 
@@ -117,5 +134,7 @@ def run():
         elif key == "2":
             vs_game()
         elif key == "3":
+            watch_bot_game()
+        elif key == "4":
             show_leaderboard()
         # 其它键忽略,重画菜单
