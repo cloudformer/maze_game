@@ -103,6 +103,10 @@ def play(grid, players):
     while True:
         clear_screen()
         draw(grid, players)
+        for player in players:             # 手动也打印 status()(学习用,和写 bot 时拿到的一样)
+            state = maze.look(grid, player["x"], player["y"])
+            state["pos"] = (player["x"], player["y"])
+            print("%s %s status()=%s" % (player["symbol"], player["label"], state))
         # 提示:每个玩家用哪套键
         hints = []
         for player in players:
@@ -144,10 +148,8 @@ def watch_bot(grid, bot, delay, max_steps):
 
     while turns < max_steps:
         clear_screen()
-        # 复用 draw 来画 bot(读它当前的 _x/_y)
         draw(grid, [{"symbol": fit2(bot.symbol), "x": bot._x, "y": bot._y}])
-        # 打印这一步 bot 真实收到的 status()(就是写 bot 时 self.status() 拿到的字典),
-        # 方便照着想编程思路:看到这个 → go_to_exit 里该 move 哪个方向。
+        # 打印 bot 这一步收到的 status()(和写 bot 时 self.status() 拿到的一样)
         print("\n%s(作者:%s) 第 %d 步" % (bot.name, bot.author, turns))
         print("go_to_exit 收到 status() =", bot.status())
         print("(据此决定往哪走;Ctrl+C 退出)")
