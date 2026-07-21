@@ -95,36 +95,54 @@ def vs_game():
 
 
 def arena_game():
-    """机器人比赛(实时):选图,几个 bot 各跑一遍,每局存进 plays,再排名。"""
+    """机器人比赛(实时):选图,输入要参赛的 bot 编号(可 1 个、几个),各跑一遍再排名。"""
     map_id = choose_map()
     if map_id is None:
         return
     grid = db.get_map(map_id)
-    bot_list = [bots.Sample1(), bots.Sample2()]   # 参赛名单(列表)
+
+    game.clear_screen()
+    print("========== 可 参 赛 的 Bot ==========\n")
+    for cls in bots.ALL:
+        print("   %d   %s %s(作者:%s)" % (cls.bot_id, cls.symbol, cls.name, cls.author))
+    print("")
+    raw = input("输入参赛 bot 编号(空格分隔,如 1 2):").split()
+
+    bot_list = []
+    for token in raw:
+        if token.isdigit():
+            cls = bots.by_id(int(token))
+            if cls is not None:
+                bot_list.append(cls())            # 建一个新实例参赛
+    if len(bot_list) == 0:
+        print("没选到 bot。按任意键返回…")
+        game.read_key()
+        return
+
     max_steps = len(grid) * len(grid[0]) * 5
     arena.run(grid, map_id, bot_list, config.BOT_STEP_DELAY, max_steps)
 
 
 def replay_game():
-    """看录像:选一张图,把这张图上所有 play 一起回放(可对比)。可选倍速。"""
-    map_id = choose_map()
-    if map_id is None:
-        return
-    play_ids = db.play_ids_on_map(map_id)
+    """看录像:输入交易 id(可多个),按倍速回放。id 从排行榜或比赛结束时能看到。"""
+    game.clear_screen()
+    print("========== 看 录 像 ==========\n")
+    print("(交易 id 在排行榜、或比赛结束时都能看到)\n")
+    raw = input("输入要回放的交易 id(可多个,空格分隔):").split()
+    play_ids = []
+    for token in raw:
+        if token.isdigit():
+            play_ids.append(int(token))
     if len(play_ids) == 0:
-        game.clear_screen()
-        print("这张图还没有录像,先玩一局或让 bot 比一场吧。")
-        print("按任意键返回…")
-        game.read_key()
         return
     delay = choose_speed()
     replay.replay(play_ids, delay)
 
 
 def show_leaderboard():
-    """排行榜:读 plays,按地图分组、步数(=len(path))从少到多列出来。"""
+    """排行榜:按地图分组、步数从少到多(每图前 10)。带交易 id,可照着去看录像。"""
     game.clear_screen()
-    print("========== 排 行 榜 ==========\n")
+    print("========== 排 行 榜(每图前10)==========\n")
     rows = db.leaderboard()
     if len(rows) == 0:
         print("还没有记录,快去玩一局!")
@@ -137,8 +155,8 @@ def show_leaderboard():
                 rank = 0
                 print("\n-- 地图 #%d --" % current_map)
             rank = rank + 1
-            when = row["time"].strftime("%Y-%m-%d %H:%M")
-            print("  %d. %-8s %3d 步   %s" % (rank, row["name"], row["steps"], when))
+            # 交易id=#.. 让你知道去"看录像"输入哪个
+            print("  %d. %-8s %3d 步   (交易id #%d)" % (rank, row["name"], row["steps"], row["id"]))
     print("\n按任意键返回…")
     game.read_key()
 
@@ -162,14 +180,18 @@ def run():
         if key == "q":
             print("拜拜!")
             return
-        if key == "1":
-            single_game()
-        elif key == "2":
-            vs_game()
-        elif key == "3":
-            arena_game()
-        elif key == "4":
-            replay_game()
-        elif key == "5":
-            show_leaderboard()
-        # 其它键忽略,重画菜单
+        # 任何模式里按 Ctrl+C 都干净地退回菜单(不再报错)
+        try:
+            if key == "1":
+                single_game()
+            elif key == "2":
+                vs_game()
+            elif key == "3":
+                arena_game()
+            elif key == "4":
+                replay_game()
+            elif key == "5":
+                show_leaderboard()
+            # 其它键忽略,重画菜单
+        except KeyboardInterrupt:
+            print("\n已中断,回到菜单…")

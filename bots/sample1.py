@@ -6,13 +6,14 @@ from bots.base import Bot
 
 
 class Sample1(Bot):
+    bot_id = 1
     name = "Sample1"
     author = "老师"
     symbol = "S1"
     direction = "right"                       # 开局朝右
-    order = ["right", "down", "left", "up"]   # 撞墙时按这个顺序挑
+    order = ["right", "down", "left", "up"]   # 撞墙时按这个顺序挑(DIRECTIONS 的一个排列)
 
-    def next_move(self):
+    def go_to_exit(self):
         s = self.status()
         # 1) 当前方向能直走就直走
         if s[self.direction] == "path":

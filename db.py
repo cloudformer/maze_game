@@ -165,31 +165,31 @@ def get_play(play_id):
     return result
 
 
-def play_ids_on_map(map_id):
-    """某张图上所有 play 的 id 清单(给"看录像"用:把这张图上的对局一起回放)。"""
-    session = Session()
-    ids = []
-    for play in session.query(Play).filter(Play.map_id == map_id).order_by(Play.id).all():
-        ids.append(play.id)
-    session.close()
-    return ids
-
-
-def leaderboard():
-    """读排行榜:所有 play,按 地图编号、再按 步数(少的在前)排好。
-    步数 = len(path)。返回 [{'map_id', 'name', 'steps', 'time'}, ...]。"""
+def leaderboard(top=10):
+    """读排行榜:按 地图、再按 步数(少的在前)排;每张图只取前 top 名(默认10)。
+    步数 = len(path)。返回 [{'id', 'map_id', 'name', 'steps'}, ...]。
+    带上 play 的 id,方便照着去"看录像"。"""
     session = Session()
     rows = []
-    for play in session.query(Play).order_by(Play.map_id).all():
+    for play in session.query(Play).all():
         rows.append({
+            "id": play.id,
             "map_id": play.map_id,
             "name": play.player.name,
             "steps": play.steps(),
-            "time": play.created_at,
         })
     session.close()
     rows.sort(key=lambda r: (r["map_id"], r["steps"]))
-    return rows
+
+    # 每张图只留前 top 名
+    result = []
+    seen = {}
+    for row in rows:
+        count = seen.get(row["map_id"], 0)
+        if count < top:
+            result.append(row)
+            seen[row["map_id"]] = count + 1
+    return result
 
 
 def init_db():

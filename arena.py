@@ -6,13 +6,15 @@ import db
 
 
 def run(grid, map_id, bot_list, delay, max_steps):
-    """让 bot_list 里每个 bot 在同一张图上各跑一遍,每局存进 plays,最后按步数排名。"""
+    """让 bot_list 里每个 bot 在同一张图上各跑一遍,每局(通关的)存进 plays,
+    最后按步数排名。返回本场记录下来的交易 id 列表(用来看录像)。"""
     results = []                              # 收集 (bot, 步数);没走出去记 None
+    play_ids = []                             # 本场存下来的交易 id
     for bot in bot_list:
         steps = game.watch_bot(grid, bot, delay, max_steps)   # 看它跑,拿回步数
         # 只记【跑到终点】的(通关才有成绩);超时没出去的不记
         if steps is not None:
-            db.save_play(bot.name, map_id, bot.memory, game.fit2(bot.symbol))
+            play_ids.append(db.save_play(bot.name, map_id, bot.memory, game.fit2(bot.symbol)))
         results.append((bot, steps))
         print("\n按任意键看下一个…")
         game.read_key()
@@ -36,5 +38,7 @@ def run(grid, map_id, bot_list, delay, max_steps):
         print("  %d. %s %s(作者:%s)  %s" %
               (place, bot.symbol, bot.name, bot.author, outcome))
         place = place + 1
-    print("\n按任意键返回…")
+    print("\n本场交易 id:", play_ids, " —— 用「看录像」输入这些 id 就能回放")
+    print("按任意键返回…")
     game.read_key()
+    return play_ids

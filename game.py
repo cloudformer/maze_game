@@ -9,14 +9,8 @@
 import os
 import sys
 import time
-import config  # 墙/出口/小人图标 都在 config.py 里
-
-WALL = config.WALL
-EXIT = config.EXIT
-
-# 四个方向 -> 走法 (dx, dy)。x=列 y=行;上 y-1、下 y+1、左 x-1、右 x+1。
-# 这是全项目唯一定义方向增量的地方(人和 bot 都用它)。
-MOVES = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+import config  # 小人图标等
+import maze     # 迷宫世界规则:MOVES / find_exit / try_step 等
 
 # 控制方案清单:第 i 个玩家用第 i 套键。想加第 3 个人就再加一套(图标也要在 config.PLAYERS 补一个)。
 # keys 把"按下的键"映射到"方向名",增量统一去查 MOVES。
@@ -83,44 +77,6 @@ def read_key():
         return ch.lower()
 
 
-def find_exit(grid):
-    """在地图里找到出口的坐标 (x, y)。"""
-    for y in range(len(grid)):
-        for x in range(len(grid[y])):
-            if grid[y][x] == EXIT:
-                return (x, y)
-    return None
-
-
-# ---- 下面这几件事全是"游戏"的责任:知道哪里是墙、能不能走、怎么走一步。----
-# 人类和 bot 都用这几个函数,bot 只负责"说一个方向",绝不自己碰地图。
-
-def is_wall(grid, x, y):
-    """(x, y) 那格是不是墙?"""
-    return grid[y][x] == WALL
-
-
-def look(grid, x, y):
-    """站在 (x, y) 看四邻:返回 {'up':'path'/'wall', 'down':.., 'left':.., 'right':..}。
-    'path'=路(能走),'wall'=墙。这就是递给 bot 的"小抄"。"""
-    result = {}
-    for direction in MOVES:
-        dx, dy = MOVES[direction]
-        result[direction] = "wall" if is_wall(grid, x + dx, y + dy) else "path"
-    return result
-
-
-def try_step(grid, x, y, dx, dy):
-    """从 (x, y) 往 (dx, dy) 走一步:
-    是路就返回 (新x, 新y, True);是墙就原地不动、返回 (x, y, False)。
-    撞墙的判断只在这一个地方做,人类和 bot 共用。"""
-    nx = x + dx
-    ny = y + dy
-    if is_wall(grid, nx, ny):
-        return (x, y, False)
-    return (nx, ny, True)
-
-
 def draw(grid, players):
     """打印地图,并把每个小人叠在自己的位置上。
     对 grid 只读不改:每行复制一份再改副本,原地图不动。
@@ -138,7 +94,7 @@ def play(grid, players):
     players:玩家清单(用 make_players 造)。
     每个玩家会自动记轨迹到 player["path"](走一步记一个位置),步数 = len(path)。
     返回获胜的那个玩家;中途按 Q 退出则返回 None(轨迹仍在各玩家的 path 里)。"""
-    exit_pos = find_exit(grid)
+    exit_pos = maze.find_exit(grid)
     for player in players:                     # 所有人从左上角起步,轨迹清空
         player["x"] = 1
         player["y"] = 1
@@ -161,9 +117,9 @@ def play(grid, players):
         for player in players:
             if key in player["keys"]:
                 direction = player["keys"][key]   # 键 -> 方向名
-                dx, dy = MOVES[direction]         # 方向名 -> 增量(唯一来源)
-                # 走一步交给游戏的 try_step 判断(撞墙不动)
-                nx, ny, moved = try_step(grid, player["x"], player["y"], dx, dy)
+                dx, dy = maze.MOVES[direction]    # 方向名 -> 增量(唯一来源)
+                # 走一步交给 maze.try_step 判断(撞墙不动)
+                nx, ny, moved = maze.try_step(grid, player["x"], player["y"], dx, dy)
                 if moved:
                     player["x"] = nx
                     player["y"] = ny
@@ -177,10 +133,10 @@ def play(grid, players):
 
 def watch_bot(grid, bot, delay, max_steps):
     """看一个 bot 自己走迷宫(动画)。走到出口返回回合数;太多回合没出去返回 None。
-    分工:游戏把地图和起点交给 bot(塞进 bot._grid/_x/_y),然后一圈圈喊 bot.next_move();
-          bot 在 next_move 里自己用 status()/move() 感知和行走。
+    分工:游戏把地图和起点交给 bot(塞进 bot._grid/_x/_y),然后一圈圈喊 bot.go_to_exit();
+          bot 在 go_to_exit 里自己用 status()/move() 感知和行走。
           画面、计时、判断到没到出口、回合上限 —— 都是游戏管。bot 不碰地图。"""
-    exit_pos = find_exit(grid)
+    exit_pos = maze.find_exit(grid)
     bot._grid = grid            # 把地图交给 bot 的"遥控器"(它只经 status/move 用)
     bot._x = 1                  # 起点由游戏定
     bot._y = 1
@@ -190,14 +146,18 @@ def watch_bot(grid, bot, delay, max_steps):
         clear_screen()
         # 复用 draw 来画 bot(读它当前的 _x/_y)
         draw(grid, [{"symbol": fit2(bot.symbol), "x": bot._x, "y": bot._y}])
-        print("\n%s(作者:%s)自己在走…  第 %d 步" % (bot.name, bot.author, turns))
+        # 打印这一步 bot 真实收到的 status()(就是写 bot 时 self.status() 拿到的字典),
+        # 方便照着想编程思路:看到这个 → go_to_exit 里该 move 哪个方向。
+        print("\n%s(作者:%s) 第 %d 步" % (bot.name, bot.author, turns))
+        print("go_to_exit 收到 status() =", bot.status())
+        print("(据此决定往哪走;Ctrl+C 退出)")
 
         if (bot._x, bot._y) == exit_pos:
             print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, turns))
             return turns
 
         time.sleep(delay)       # 停一下,才看得见动画
-        bot.next_move()         # bot 自己 status()+move(),会更新 bot._x/_y
+        bot.go_to_exit()        # bot 自己 status()+move(),会更新 bot._x/_y
         turns = turns + 1
 
     print("\n😵 %s 走了 %d 步还没出去(超步数上限)。" % (bot.name, turns))
