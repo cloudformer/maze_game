@@ -21,8 +21,15 @@ import config   # BOT_STEP_DELAY / PLAYERS 图标
 app = Flask(__name__)
 db.init_db()          # 确保表在(只建不改,和终端共用同一个 maze.db)
 
-SIZE = 15             # 网页里生成的迷宫边长
 state = {}            # 单人/多人:当前这一局(grid / 两人位置 / 出口)
+
+
+def chosen_size():
+    """从 ?level=N 读关卡号,查共同的关卡表 config.MAP_SIZES(和终端同一张表)。"""
+    level = request.args.get("level", "3")
+    if level.isdigit() and int(level) in config.MAP_SIZES:
+        return config.MAP_SIZES[int(level)]
+    return 15
 
 
 def cell_types(grid):
@@ -81,14 +88,16 @@ def run_bot(grid, bot):
 @app.route("/")
 def menu():
     bot_list = [{"id": c.bot_id, "name": c.name, "author": c.author} for c in bots.ALL]
-    return render_template("menu.html", bots=bot_list, plays=db.leaderboard())
+    return render_template("menu.html", bots=bot_list, plays=db.leaderboard(),
+                           sizes=config.MAP_SIZES)
 
 
 # ---------------- 单人 / 多人(可交互) ----------------
 @app.route("/play")
 def play():
     mode = request.args.get("mode", "single")     # single | vs
-    grid = mazegen.generate(SIZE, SIZE)
+    size = chosen_size()
+    grid = mazegen.generate(size, size)
     state["grid"] = grid
     state["exit"] = maze.find_exit(grid)
     # 玩家和终端里同一个形状:位置 + 轨迹 + moved(game.step 会维护它们)
@@ -126,7 +135,8 @@ def save():
     """赢了签名进 db(和终端同一条街机规矩:通关才有名字)。返回交易 id。"""
     key = "p1" if request.args.get("p") == "1" else "p2"
     name = request.args.get("name", "").strip() or "无名氏"
-    map_id = db.save_map(SIZE, SIZE, state["grid"])          # 这局的图也入库,回放要用
+    grid = state["grid"]
+    map_id = db.save_map(len(grid[0]), len(grid), grid)      # 这局的图也入库,回放要用
     symbol = config.PLAYERS[0] if key == "p1" else config.PLAYERS[1]
     play_id = db.save_play(name, map_id, state[key]["path"], game.fit2(symbol))
     return jsonify(play_id=play_id)
@@ -137,7 +147,8 @@ def save():
 def bot_page():
     bot_id = int(request.args.get("id", "1"))
     cls = bots.by_id(bot_id)
-    grid = mazegen.generate(SIZE, SIZE)
+    size = chosen_size()
+    grid = mazegen.generate(size, size)
     path = run_bot(grid, cls())
     title = "%s(作者:%s)跑迷宫 —— %d 步" % (cls.name, cls.author, len(path))
     return render_template("watch.html", cells=cell_types(grid), title=title,

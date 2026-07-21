@@ -28,10 +28,20 @@ a { color:#9cf; }
 /* 菜单 */
 .menu { max-width:520px; margin:0 auto; text-align:left; }
 .menu h3 { color:#e6d84f; border-bottom:1px solid #333; padding-bottom:4px; margin-top:22px; }
-.btn { display:inline-block; margin:5px 6px 5px 0; background:#333; color:#ddd;
-       border:1px solid #666; padding:8px 16px; border-radius:6px; cursor:pointer;
-       text-decoration:none; }
+.menu .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.menu label { color:#888; font-size:14px; }
+.btn { display:inline-block; background:#333; color:#ddd; min-width:96px; text-align:center;
+       border:1px solid #666; padding:8px 14px; border-radius:6px; cursor:pointer;
+       text-decoration:none; font-size:14px; }
 .btn:hover { background:#444; }
+
+/* 录像列表:紧凑表格 */
+table.plays { border-collapse:collapse; font-size:13px; margin-top:4px; }
+table.plays th, table.plays td { border:1px solid #333; padding:3px 12px; text-align:center; }
+table.plays th { color:#e6d84f; font-weight:normal; background:#161616; }
+table.plays td { color:#bbb; }
+table.plays a { color:#9cf; text-decoration:none; }
+table.plays tr:hover td { background:#1a1a1a; }
 
 select { background:#333; color:#ddd; border:1px solid #666; padding:4px 8px; border-radius:4px; }
 
