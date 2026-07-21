@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h2>{{ title }}</h2>
+  <div id="msg"></div>
+
+  <div id="maze" style="grid-template-columns: repeat({{ cells[0]|length }}, var(--cell));">
+    {% for row in cells %}{% for c in row %}<div class="cell {{ c }}">{% if c == 'exit' %}🏁{% endif %}</div>{% endfor %}{% endfor %}
+    <div id="tank" class="tank bot"><div class="body"></div><div class="barrel"></div></div>
+  </div>
+
+  <p>
+    倍速:
+    <select id="speed">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="5">5x</option>
+      <option value="10">10x</option>
+    </select>
+    　<a href="/">← 返回菜单</a>　<a href="javascript:location.reload()">重播</a>
+  </p>
+
+  <div>每一步的 status(和写 bot 时 status() 拿到的一样):</div>
+  <pre id="out">播放中…</pre>
+
+<script>
+  const CELL = 26;
+  const BASE = {{ base }};                // 标准每帧毫秒数,来自 config.BOT_STEP_DELAY(两端同源)
+  const FRAMES = {{ frames | tojson }};   // [{dir, moved, status:{...,pos}}, ...]
+  const tank = document.getElementById('tank');
+  const msg = document.getElementById('msg');
+  const out = document.getElementById('out');
+  const ROT = { up:0, right:90, down:180, left:270 };
+
+  function place(x, y) { tank.style.left = (x*CELL)+'px'; tank.style.top = (y*CELL)+'px'; }
+  place(1, 1);                            // 起点
+
+  let i = 0;
+  function step() {
+    if (i >= FRAMES.length) {
+      msg.textContent = '🏁 到达终点!共 ' + FRAMES.length + ' 步';
+      return;
+    }
+    const f = FRAMES[i];
+    tank.style.transform = 'rotate(' + ROT[f.dir] + 'deg)';
+    place(f.status.pos[0], f.status.pos[1]);
+    out.textContent = JSON.stringify(f);   // 显示这一步的 status
+    i = i + 1;
+    // 每帧停顿 = 0.2秒 ÷ 下拉选的倍速 —— 每帧都重新读,一改立即生效
+    setTimeout(step, BASE / Number(document.getElementById('speed').value));
+  }
+  setTimeout(step, BASE);
+</script>
+</body>
+</html>

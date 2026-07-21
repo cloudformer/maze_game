@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ '多人对战' if mode == 'vs' else '单人闯关' }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h2>{{ '多 人 对 战' if mode == 'vs' else '单 人 闯 关' }}</h2>
+  <div id="msg"></div>
+
+  <div id="maze" style="grid-template-columns: repeat({{ cells[0]|length }}, var(--cell));">
+    {% for row in cells %}{% for c in row %}<div class="cell {{ c }}">{% if c == 'exit' %}🏁{% endif %}</div>{% endfor %}{% endfor %}
+    <div id="t1" class="tank p1"><div class="body"></div><div class="barrel"></div></div>
+    {% if mode == 'vs' %}<div id="t2" class="tank p2"><div class="body"></div><div class="barrel"></div></div>{% endif %}
+  </div>
+
+  <div class="keys">
+    {% if mode == 'vs' %}
+      <b class="y">玩家1(黄)</b>:W A S D　　<b class="g">玩家2(绿)</b>:方向键 ↑↓←→
+    {% else %}
+      <b class="y">你(黄)</b>:W A S D 或 方向键
+    {% endif %}
+  </div>
+  <p><a href="/">← 返回菜单</a>　<a href="javascript:location.reload()">换一张地图</a></p>
+
+  <div>/move 返回(写 bot 时的 status 就长这样):</div>
+  <pre id="out">按键走一步,这里显示服务器返回的 JSON…</pre>
+
+<script>
+  const MODE = "{{ mode }}";
+  const CELL = 26;
+  const t1 = document.getElementById('t1');
+  const t2 = document.getElementById('t2');   // 单人模式下为 null
+  const msg = document.getElementById('msg');
+  const out = document.getElementById('out');
+  const ROT = { up:0, right:90, down:180, left:270 };
+
+  function place(el, x, y) { if (el) { el.style.left = (x*CELL)+'px'; el.style.top = (y*CELL)+'px'; } }
+  place(t1, {{ p1[0] }}, {{ p1[1] }});
+  place(t2, {{ p2[0] }}, {{ p2[1] }});
+
+  // 按键 -> [玩家, 方向]。多人:方向键给玩家2;单人:方向键也给玩家1
+  const KEYS = (MODE === 'vs')
+    ? { w:[1,'up'],s:[1,'down'],a:[1,'left'],d:[1,'right'],
+        ArrowUp:[2,'up'],ArrowDown:[2,'down'],ArrowLeft:[2,'left'],ArrowRight:[2,'right'] }
+    : { w:[1,'up'],s:[1,'down'],a:[1,'left'],d:[1,'right'],
+        ArrowUp:[1,'up'],ArrowDown:[1,'down'],ArrowLeft:[1,'left'],ArrowRight:[1,'right'] };
+
+  document.addEventListener('keydown', async (e) => {
+    const m = KEYS[e.key];
+    if (!m) return;
+    e.preventDefault();
+    const [p, dir] = m;
+    (p === 1 ? t1 : t2).style.transform = 'rotate(' + ROT[dir] + 'deg)';
+    const res = await fetch('/move?p=' + p + '&dir=' + dir);
+    const s = await res.json();
+    place(t1, s.p1[0], s.p1[1]);
+    place(t2, s.p2[0], s.p2[1]);
+    out.textContent = JSON.stringify(s);
+    if (s.winner) {
+      msg.textContent = (MODE === 'vs') ? ('🎉 玩家' + s.winner + ' 获胜!') : '🎉 通关!';
+      // 街机规矩:赢了才签名,签了名就进数据库(输了不记)
+      const name = prompt('赢啦!输入名字记录成绩:') || '无名氏';
+      const d = await (await fetch('/save?p=' + s.winner + '&name=' + encodeURIComponent(name))).json();
+      msg.textContent += '  已记录,交易id #' + d.play_id + '(可在"看录像"回放)';
+    }
+  });
+</script>
+</body>
+</html>

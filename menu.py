@@ -40,19 +40,6 @@ def choose_map():
                     return chosen
 
 
-def choose_speed():
-    """选回放倍速,返回每帧停顿(秒)= BOT_STEP_DELAY / 倍数。"""
-    game.clear_screen()
-    print("========== 选 倍 速 ==========\n")
-    print("   1    正常 (1x)")
-    print("   2    2 倍速")
-    print("   3    5 倍速")
-    print("   4    10 倍速\n")
-    print("按键选择:")
-    factor = {"1": 1, "2": 2, "3": 5, "4": 10}.get(game.read_key(), 1)
-    return config.BOT_STEP_DELAY / factor
-
-
 def single_game():
     """单人:选图闯关。走完(通关或中途退)都把这局存进 plays。"""
     map_id = choose_map()
@@ -124,7 +111,7 @@ def arena_game():
 
 
 def replay_game():
-    """看录像:输入交易 id(可多个),按倍速回放。id 从排行榜或比赛结束时能看到。"""
+    """看录像:输入交易 id(可多个)。播放中按 1/2/3/4 调倍速,Q 退出。"""
     game.clear_screen()
     print("========== 看 录 像 ==========\n")
     print("(交易 id 在排行榜、或比赛结束时都能看到)\n")
@@ -135,8 +122,7 @@ def replay_game():
             play_ids.append(int(token))
     if len(play_ids) == 0:
         return
-    delay = choose_speed()
-    replay.replay(play_ids, delay)
+    replay.replay(play_ids)
 
 
 def show_leaderboard():

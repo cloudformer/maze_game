@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>迷宫 · 坦克大战</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h2>迷 宫 · 坦 克 大 战</h2>
+
+  <div class="menu">
+    <h3>玩</h3>
+    <a class="btn" href="/play?mode=single">单人闯关</a>
+    <a class="btn" href="/play?mode=vs">多人对战</a>
+
+    <h3>看机器人跑</h3>
+    {% for b in bots %}
+      <a class="btn" href="/bot?id={{ b.id }}">{{ b.name }}(作者:{{ b.author }})</a>
+    {% endfor %}
+
+    <h3>看录像(数据库里存的对局)</h3>
+    {% if plays %}
+      {% for p in plays %}
+        <a class="btn" href="/replay?id={{ p.id }}">#{{ p.id }} {{ p.name }} · 地图{{ p.map_id }} · {{ p.steps }}步</a>
+      {% endfor %}
+    {% else %}
+      <p class="keys">还没有录像。去终端玩几局 / 跑一场比赛(arena)就有了。</p>
+    {% endif %}
+  </div>
+</body>
+</html>

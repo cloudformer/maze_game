@@ -77,6 +77,38 @@ def read_key():
         return ch.lower()
 
 
+def wait_key(seconds):
+    """最多等 seconds 秒:期间按了键就立刻返回那个键,没按返回 None。
+    (回放用:既是"每帧的停顿",又能随时收到调倍速/退出的按键。)"""
+    if os.name == "nt":
+        import msvcrt
+        end = time.time() + seconds
+        while time.time() < end:
+            if msvcrt.kbhit():
+                return read_key()
+            time.sleep(0.01)
+        return None
+    else:
+        import select
+        import tty
+        import termios
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            ready = select.select([sys.stdin], [], [], seconds)[0]  # 等按键,最多 seconds 秒
+            if ready:
+                ch = sys.stdin.read(1)
+                if ch == "\x1b":
+                    seq = sys.stdin.read(2)
+                    arrows = {"[A": "up", "[B": "down", "[D": "left", "[C": "right"}
+                    return arrows.get(seq, "")
+                return ch.lower()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        return None
+
+
 def draw(grid, players):
     """打印地图,并把每个小人叠在自己的位置上。
     对 grid 只读不改:每行复制一份再改副本,原地图不动。
@@ -89,6 +121,19 @@ def draw(grid, players):
         print("".join(row))                   # 每格 2 字符宽,拼起来就是正方形
 
 
+def step(grid, player, direction):
+    """走一步 —— 游戏的基本动作,终端和网页共用同一份:
+    撞墙不动;走成了就更新位置、把新位置记进 path(轨迹,回放和算步数用)。
+    player["moved"] 记这一步的结果:1=走了 0=撞墙(和 bot 的 move() 返回一样)。"""
+    dx, dy = maze.MOVES[direction]
+    nx, ny, ok = maze.try_step(grid, player["x"], player["y"], dx, dy)
+    player["moved"] = 1 if ok else 0
+    if ok:
+        player["x"] = nx
+        player["y"] = ny
+        player["path"].append([nx, ny])
+
+
 def play(grid, players):
     """在迷宫里走小人,谁先到出口谁赢。
     players:玩家清单(用 make_players 造)。
@@ -99,6 +144,7 @@ def play(grid, players):
         player["x"] = 1
         player["y"] = 1
         player["path"] = []
+        player["moved"] = "-"                  # 上一步:1=走了 0=撞墙 -=还没走过
 
     while True:
         clear_screen()
@@ -106,7 +152,8 @@ def play(grid, players):
         for player in players:             # 手动也打印 status()(学习用,和写 bot 时拿到的一样)
             state = maze.look(grid, player["x"], player["y"])
             state["pos"] = (player["x"], player["y"])
-            print("%s %s status()=%s" % (player["symbol"], player["label"], state))
+            print("%s %s status()=%s  moved=%s" % (player["symbol"], player["label"],
+                                                   state, player["moved"]))
         # 提示:每个玩家用哪套键
         hints = []
         for player in players:
@@ -120,18 +167,11 @@ def play(grid, players):
         # 这个键属于哪个玩家,就动哪个玩家(一个键只属于一个人)
         for player in players:
             if key in player["keys"]:
-                direction = player["keys"][key]   # 键 -> 方向名
-                dx, dy = maze.MOVES[direction]    # 方向名 -> 增量(唯一来源)
-                # 走一步交给 maze.try_step 判断(撞墙不动)
-                nx, ny, moved = maze.try_step(grid, player["x"], player["y"], dx, dy)
-                if moved:
-                    player["x"] = nx
-                    player["y"] = ny
-                    player["path"].append((nx, ny))   # 记轨迹(回放/步数用)
-                    if (nx, ny) == exit_pos:
-                        clear_screen()
-                        draw(grid, players)
-                        return player          # 这个玩家先到,赢了
+                step(grid, player, player["keys"][key])   # 走一步(通用逻辑在 step 里)
+                if (player["x"], player["y"]) == exit_pos:
+                    clear_screen()
+                    draw(grid, players)
+                    return player              # 这个玩家先到,赢了
                 break
 
 
