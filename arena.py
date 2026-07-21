@@ -1,5 +1,5 @@
 # arena.py —— bot 比赛:传进来一串 bot,同一张图各跑一遍,比谁步数少(谁更聪明)。
-# 关键:参数是一个【列表】bot_list,想比几个就放几个,如 [RandomBot(), Sample1(), Sample2()]。
+# 关键:参数是一个【列表】bot_list,想比几个就放几个,如 [Sample1(), Sample2()]。
 
 import game
 import db

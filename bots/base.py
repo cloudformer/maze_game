@@ -12,9 +12,6 @@
 
 import game   # 复用游戏现成的读墙(look)、走位(try_step);bot 不直接碰 grid
 
-# bot 说的方向(全词) -> 游戏内部用的方向码
-_DIR = {"up": "U", "down": "D", "left": "L", "right": "R"}
-
 
 class Bot:
     name = "base"       # bot 名字
@@ -41,17 +38,14 @@ class Bot:
         {'up':'path'/'wall', 'down':.., 'left':.., 'right':.., 'pos':(x,y)}
         值:'path'=路(能走),'wall'=墙(过不去);'pos' 是当前坐标(方便记录/回放)。
         想看某个方向,自己取:status()["up"]。"""
-        walls = game.look(self._grid, self._x, self._y)   # {'U':bool,...} True=墙
-        state = {}
-        for name, code in _DIR.items():
-            state[name] = "wall" if walls[code] else "path"
+        state = game.look(self._grid, self._x, self._y)   # {'up':'path'/'wall', ...}
         state["pos"] = (self._x, self._y)
         return state
 
     def move(self, direction):
         """朝 direction 走一步。走成功返回 1;前面是墙、没走成返回 0。
         走成功会自动把新位置记进 self.memory(回放用)。"""
-        dx, dy = game.MOVES[_DIR[direction]]
+        dx, dy = game.MOVES[direction]
         nx, ny, moved = game.try_step(self._grid, self._x, self._y, dx, dy)
         if moved:
             self._x = nx

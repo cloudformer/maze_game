@@ -14,15 +14,15 @@ import config  # 墙/出口/小人图标 都在 config.py 里
 WALL = config.WALL
 EXIT = config.EXIT
 
-# bot 用的四个方向 -> 走法 (dx, dy)。'U'上 'D'下 'L'左 'R'右。
-MOVES = {"U": (0, -1), "D": (0, 1), "L": (-1, 0), "R": (1, 0)}
+# 四个方向 -> 走法 (dx, dy)。x=列 y=行;上 y-1、下 y+1、左 x-1、右 x+1。
+# 这是全项目唯一定义方向增量的地方(人和 bot 都用它)。
+MOVES = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 
-# 控制方案清单:第 i 个玩家用第 i 套键。想加第 4 个人就再加一套。
-# 走法 (dx, dy):x=列 y=行;上 y-1、下 y+1、左 x-1、右 x+1。
+# 控制方案清单:第 i 个玩家用第 i 套键。想加第 3 个人就再加一套(图标也要在 config.PLAYERS 补一个)。
+# keys 把"按下的键"映射到"方向名",增量统一去查 MOVES。
 CONTROLS = [
-    {"name": "W/A/S/D", "keys": {"w": (0, -1), "s": (0, 1), "a": (-1, 0), "d": (1, 0)}},
-    {"name": "方向键",   "keys": {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}},
-    {"name": "I/J/K/L", "keys": {"i": (0, -1), "k": (0, 1), "j": (-1, 0), "l": (1, 0)}},
+    {"name": "W/A/S/D", "keys": {"w": "up", "s": "down", "a": "left", "d": "right"}},
+    {"name": "方向键",   "keys": {"up": "up", "down": "down", "left": "left", "right": "right"}},
 ]
 
 
@@ -101,13 +101,13 @@ def is_wall(grid, x, y):
 
 
 def look(grid, x, y):
-    """站在 (x, y) 看四邻:返回 {'U':是不是墙, 'D':..., 'L':..., 'R':...}。
-    这就是递给 bot 的"小抄"——bot 靠它决定往哪走,不用去撞。"""
-    walls = {}
+    """站在 (x, y) 看四邻:返回 {'up':'path'/'wall', 'down':.., 'left':.., 'right':..}。
+    'path'=路(能走),'wall'=墙。这就是递给 bot 的"小抄"。"""
+    result = {}
     for direction in MOVES:
         dx, dy = MOVES[direction]
-        walls[direction] = is_wall(grid, x + dx, y + dy)
-    return walls
+        result[direction] = "wall" if is_wall(grid, x + dx, y + dy) else "path"
+    return result
 
 
 def try_step(grid, x, y, dx, dy):
@@ -160,7 +160,8 @@ def play(grid, players):
         # 这个键属于哪个玩家,就动哪个玩家(一个键只属于一个人)
         for player in players:
             if key in player["keys"]:
-                dx, dy = player["keys"][key]
+                direction = player["keys"][key]   # 键 -> 方向名
+                dx, dy = MOVES[direction]         # 方向名 -> 增量(唯一来源)
                 # 走一步交给游戏的 try_step 判断(撞墙不动)
                 nx, ny, moved = try_step(grid, player["x"], player["y"], dx, dy)
                 if moved:

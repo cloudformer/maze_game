@@ -65,5 +65,4 @@ def generate(width, height):
     carve(1, 1)  # 从左上角开始挖
 
     grid[height - 2][width - 2] = EXIT  # 右下角那格路,标成出口
-    print(grid)
     return grid

@@ -1,11 +1,11 @@
 # main.py —— 程序入口。命令:
-#   python main.py gen [宽 高]    生成一张迷宫,存进数据库(不玩)
-#   python main.py play 编号      玩数据库里指定编号的地图
-# gen 的宽高不写就默认 15 15。
+#   python main.py              打开开始菜单(平时就用这个)
+#   python main.py gen [宽 高]    生成一张迷宫,存进数据库
+#   python main.py gen all       按关卡表生成 9 关默认地图
+# gen 的宽高不写就默认 15 15。玩游戏都在菜单里(单人/双人/比赛/回放)。
 
 import sys
 import mazegen
-import game
 import db
 import config
 import menu
@@ -46,20 +46,6 @@ def gen_all():
     print("完成:9 关默认地图都生成好了。用 python main.py play 编号 开玩")
 
 
-def do_play(args):
-    """玩数据库里指定编号的地图。play 只负责"玩",不生成。
-    没指定编号、或那张图不存在,就直接告诉你。"""
-    if len(args) < 2:
-        print("请指定要玩哪张地图,例如:python main.py play 1")
-        return
-    map_id = int(args[1])
-    grid = db.get_map(map_id)                    # 从库里按编号取
-    if grid is None:
-        print("没有地图 #" + str(map_id) + ",先用 python main.py gen 生成一张")
-        return
-    game.play(grid)
-
-
 def main():
     db.init_db()  # 确保数据库和三张表都在(已存在就什么都不做)
 
@@ -70,14 +56,12 @@ def main():
         menu.run()          # 直接 python main.py 就进开始菜单(FC 风格)
     elif args[0] == "gen":
         do_gen(args)
-    elif args[0] == "play":
-        do_play(args)
     else:
         print("用法:")
-        print("  python main.py              打开开始菜单(选模式/选地图/玩)")
+        print("  python main.py              打开开始菜单(玩都在这里)")
         print("  python main.py gen [宽 高]    生成一张迷宫并存进数据库")
         print("  python main.py gen all       按关卡表生成 9 关默认地图")
-        print("  python main.py play 编号      玩指定编号的地图")
 
 
-main()
+if __name__ == "__main__":
+    main()
