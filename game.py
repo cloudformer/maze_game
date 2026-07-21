@@ -136,12 +136,13 @@ def draw(grid, players):
 def play(grid, players):
     """在迷宫里走小人,谁先到出口谁赢。
     players:玩家清单(用 make_players 造)。
-    返回获胜的那个玩家(里面有 label / steps);中途按 Q 退出则返回 None。"""
+    每个玩家会自动记轨迹到 player["path"](走一步记一个位置),步数 = len(path)。
+    返回获胜的那个玩家;中途按 Q 退出则返回 None(轨迹仍在各玩家的 path 里)。"""
     exit_pos = find_exit(grid)
-    for player in players:                     # 所有人从左上角起步,步数清零
+    for player in players:                     # 所有人从左上角起步,轨迹清空
         player["x"] = 1
         player["y"] = 1
-        player["steps"] = 0
+        player["path"] = []
 
     while True:
         clear_screen()
@@ -165,7 +166,7 @@ def play(grid, players):
                 if moved:
                     player["x"] = nx
                     player["y"] = ny
-                    player["steps"] = player["steps"] + 1
+                    player["path"].append((nx, ny))   # 记轨迹(回放/步数用)
                     if (nx, ny) == exit_pos:
                         clear_screen()
                         draw(grid, players)
@@ -174,37 +175,29 @@ def play(grid, players):
 
 
 def watch_bot(grid, bot, delay, max_steps):
-    """看一个 bot 自己走迷宫(动画)。走到出口返回步数;走太多步还没出去返回 None。
-    分工:游戏负责 look(给四邻)、try_step(判断墙、走一步)、画面、位置、计步;
-          bot 只负责 next_move —— 说一个方向。bot 从头到尾不碰地图。"""
+    """看一个 bot 自己走迷宫(动画)。走到出口返回回合数;太多回合没出去返回 None。
+    分工:游戏把地图和起点交给 bot(塞进 bot._grid/_x/_y),然后一圈圈喊 bot.next_move();
+          bot 在 next_move 里自己用 status()/move() 感知和行走。
+          画面、计时、判断到没到出口、回合上限 —— 都是游戏管。bot 不碰地图。"""
     exit_pos = find_exit(grid)
-    x = 1                       # bot 位置由游戏管着
-    y = 1
-    steps = 0
-    bot_player = {"symbol": fit2(bot.symbol), "x": x, "y": y}  # 复用 draw 来画 bot
+    bot._grid = grid            # 把地图交给 bot 的"遥控器"(它只经 status/move 用)
+    bot._x = 1                  # 起点由游戏定
+    bot._y = 1
+    turns = 0
 
-    while steps < max_steps:
+    while turns < max_steps:
         clear_screen()
-        bot_player["x"] = x
-        bot_player["y"] = y
-        draw(grid, [bot_player])
-        print("\n%s(作者:%s)自己在走…  第 %d 步" % (bot.name, bot.author, steps))
-        time.sleep(delay)                       # 停一下,才看得见动画
+        # 复用 draw 来画 bot(读它当前的 _x/_y)
+        draw(grid, [{"symbol": fit2(bot.symbol), "x": bot._x, "y": bot._y}])
+        print("\n%s(作者:%s)自己在走…  第 %d 步" % (bot.name, bot.author, turns))
 
-        walls = look(grid, x, y)                 # 游戏把四邻小抄递给 bot
-        move = bot.next_move((x, y), walls)      # bot 只说一个方向
-        dx, dy = MOVES[move]
-        x, y, moved = try_step(grid, x, y, dx, dy)  # 游戏判断能不能走、走一步
-        if moved:
-            steps = steps + 1
-            if (x, y) == exit_pos:
-                clear_screen()
-                bot_player["x"] = x
-                bot_player["y"] = y
-                draw(grid, [bot_player])
-                print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, steps))
-                return steps
+        if (bot._x, bot._y) == exit_pos:
+            print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, turns))
+            return turns
 
-    # 步数用完还没出去(RandomBot 太笨时会这样)
-    print("\n😵 %s 走了 %d 步还没出去(超步数上限)。" % (bot.name, steps))
+        time.sleep(delay)       # 停一下,才看得见动画
+        bot.next_move()         # bot 自己 status()+move(),会更新 bot._x/_y
+        turns = turns + 1
+
+    print("\n😵 %s 走了 %d 步还没出去(超步数上限)。" % (bot.name, turns))
     return None

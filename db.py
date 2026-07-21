@@ -62,38 +62,37 @@ class Player(Base):
     name = Column(String, nullable=False, unique=True)   # 名字,不能重名
     created_at = Column(DateTime, default=datetime.now)
 
-    # 反向关联:通过 player.plays 拿到"这个人玩过的所有对局"
+    # 反向关联:通过 player.plays 拿到"这个人玩过的所有 plays"
     plays = relationship("Play", back_populates="player")
-
-    def stats(self):
-        """战绩:从这个玩家的所有对局里算出来。
-        返回 总局数 / 通关数 / 最好成绩(最少步数)。"""
-        total = len(self.plays)
-        wins = 0
-        best_steps = None
-        for play in self.plays:
-            if play.success:
-                wins = wins + 1
-                if best_steps is None or play.steps < best_steps:
-                    best_steps = play.steps
-        return {"total": total, "wins": wins, "best_steps": best_steps}
 
 
 class Play(Base):
-    """对局表(关联表):记录"某人在某张图上玩了一局"。
-    两个外键 player_id / map_id 把 玩家 和 地图 连起来 —— 这是三张表的关联核心。"""
+    """plays 表(关联表):记录"某人在某张图上玩的一局"。人和 bot 都记在这里。
+    两个外键 player_id / map_id 把 玩家 和 地图 连起来 —— 这是三张表的关联核心。
+    只要有一个 play 的 id,就能拿到:谁玩的、哪张图、完整轨迹、用什么图标画。"""
     __tablename__ = "plays"
 
     id = Column(Integer, primary_key=True)
-    player_id = Column(Integer, ForeignKey("players.id"), nullable=False)  # 那个人
-    map_id = Column(Integer, ForeignKey("maps.id"), nullable=False)        # 那张图
-    steps = Column(Integer, nullable=False)               # 走了多少步
-    success = Column(Integer, nullable=False, default=0)   # 1=通关 0=没通关/放弃
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False)  # 谁玩的
+    map_id = Column(Integer, ForeignKey("maps.id"), nullable=False)        # 哪张图
+    path = Column(Text, nullable=False)                    # 完整轨迹(位置清单的文字)
+    symbol = Column(String, nullable=False)                # 回放时用什么图标画这条轨迹
     created_at = Column(DateTime, default=datetime.now)    # 什么时间玩的
 
     # 正向关联:通过 play.player / play.map 直接拿到对应的人和图
     player = relationship("Player", back_populates="plays")
     map = relationship("Map", back_populates="plays")
+
+    # 轨迹是一串位置,数据库只能存文字,所以用 json 互转
+    def set_path(self, path_list):
+        self.path = json.dumps(path_list)
+
+    def get_path(self):
+        return json.loads(self.path)
+
+    def steps(self):
+        """步数 = 轨迹长度(走了几步)。"""
+        return len(self.get_path())
 
 
 def save_map(width, height, grid_list):
@@ -133,33 +132,63 @@ def get_or_create_player(name):
     return player_id
 
 
-def save_play(player_id, map_id, steps, success):
-    """存一局成绩到 plays(交易)表:谁、哪张图、多少步、成功与否。
-    时间由数据库自动记(created_at 默认当前时间)。"""
+def save_play(player_name, map_id, path_list, symbol):
+    """存一局到 plays 表:谁(名字)、哪张图、完整轨迹、用什么图标画。
+    人和 bot 都调这一个函数 —— 区别只是名字/轨迹从哪来,存法一样。
+    步数不单独存,要用时 len(path) 就是步数。返回这条 play 的 id。"""
+    player_id = get_or_create_player(player_name)   # 人和 bot 都当"玩家"存
     session = Session()
-    play = Play(player_id=player_id, map_id=map_id,
-                steps=steps, success=1 if success else 0)
+    play = Play(player_id=player_id, map_id=map_id, symbol=symbol)
+    play.set_path(path_list)
     session.add(play)
     session.commit()
+    play_id = play.id
     session.close()
+    return play_id
+
+
+def get_play(play_id):
+    """按 id 取一局的全部信息,回放要用。返回字典;没有就返回 None。
+    {'id', 'name', 'map_id', 'path'(位置清单), 'symbol'}"""
+    session = Session()
+    play = session.get(Play, play_id)
+    result = None
+    if play is not None:
+        result = {
+            "id": play.id,
+            "name": play.player.name,
+            "map_id": play.map_id,
+            "path": play.get_path(),
+            "symbol": play.symbol,
+        }
+    session.close()
+    return result
+
+
+def play_ids_on_map(map_id):
+    """某张图上所有 play 的 id 清单(给"看录像"用:把这张图上的对局一起回放)。"""
+    session = Session()
+    ids = []
+    for play in session.query(Play).filter(Play.map_id == map_id).order_by(Play.id).all():
+        ids.append(play.id)
+    session.close()
+    return ids
 
 
 def leaderboard():
-    """读排行榜:所有【通关】的记录,按 地图编号、再按 步数(少的在前)排好。
-    返回一串字典,每条含 地图编号 / 名字 / 步数 / 时间。"""
+    """读排行榜:所有 play,按 地图编号、再按 步数(少的在前)排好。
+    步数 = len(path)。返回 [{'map_id', 'name', 'steps', 'time'}, ...]。"""
     session = Session()
     rows = []
-    query = (session.query(Play)
-             .filter(Play.success == 1)
-             .order_by(Play.map_id, Play.steps))
-    for play in query.all():
+    for play in session.query(Play).order_by(Play.map_id).all():
         rows.append({
             "map_id": play.map_id,
-            "name": play.player.name,   # 通过外键关联直接拿到名字
-            "steps": play.steps,
+            "name": play.player.name,
+            "steps": play.steps(),
             "time": play.created_at,
         })
     session.close()
+    rows.sort(key=lambda r: (r["map_id"], r["steps"]))
     return rows
 
 
