@@ -1,5 +1,5 @@
-# menu.py —— 开始菜单(类似 FC 游戏的选单):选模式 -> 选地图 -> 开玩
-# 按键即选,不用回车。地图从数据库列出;每一局(人或 bot)都会存进 plays,可回放。
+# menu.py —— Main menu: choose mode -> choose map -> play
+# Maps are stored in the database. Each game (player or bot) is saved in plays.
 
 import game
 import db
@@ -7,177 +7,321 @@ import bots
 import arena
 import replay
 import config
+import mazegen
 
 
 def list_maps():
-    """从数据库取所有地图,返回 [(编号, 宽, 高), ...],按编号从小到大。"""
+    """Return all maps from database: [(id, width, height), ...]."""
     session = db.Session()
     rows = []
+
     for one_map in session.query(db.Map).order_by(db.Map.id).all():
         rows.append((one_map.id, one_map.width, one_map.height))
+
     session.close()
     return rows
 
 
+def ensure_maps():
+    """
+    Create default maps if the database is empty.
+
+    Maps are generated from config.MAP_SIZES:
+    1 -> 5x5
+    2 -> 10x10 (automatically becomes 11x11)
+    ...
+    9 -> 45x45
+    """
+    if len(list_maps()) == 0:
+        print("Creating maps...")
+
+        for map_id, size in config.MAP_SIZES.items():
+            grid = mazegen.generate(size, size)
+            saved_id = db.save_map(size, size, grid)
+            print("Created map:", saved_id)
+
+
 def choose_map():
-    """列出所有地图让玩家选一张。返回选中的编号;按 B 返回则返回 None。
-    (用单个数字键选,支持编号 1~9。)"""
+    """Display maps and let the player choose one."""
     maps = list_maps()
+
     while True:
         game.clear_screen()
-        print("========== 选 地 图 ==========\n")
+
+        print("========== MAP SELECT ==========\n")
+
         for (map_id, width, height) in maps:
             print("   %d    %dx%d" % (map_id, width, height))
-        print("\n按数字键选地图,B 返回:")
+
+        print("\nPress a number key to select a map, B to go back:")
 
         key = game.read_key()
+
         if key == "b":
             return None
+
         if key.isdigit():
             chosen = int(key)
+
             for (map_id, width, height) in maps:
                 if map_id == chosen:
                     return chosen
 
 
+def load_selected_map(map_id):
+    """Load map from database safely."""
+    grid = db.get_map(map_id)
+
+    if grid is None:
+        print("Map not found.")
+        game.read_key()
+        return None
+
+    return grid
+
+
 def single_game():
-    """单人:选图闯关。走完(通关或中途退)都把这局存进 plays。"""
+    """Single player mode."""
     map_id = choose_map()
+
     if map_id is None:
         return
-    grid = db.get_map(map_id)
+
+    grid = load_selected_map(map_id)
+
+    if grid is None:
+        return
+
     players = game.make_players(1)
+
     winner = game.play(grid, players)
+
     me = players[0]
-    if winner is None:                          # 没通关:不记名、不进榜(街机规矩)
-        print("\n没走到终点,下次加油!按任意键返回…")
+
+    if winner is None:
+        print("\nYou did not reach the exit.")
+        print("Press any key to return...")
         game.read_key()
         return
-    # 通关了才让你输名字 —— 有名字 = 通关
-    print("\n🎉 通关!你走了 %d 步。" % len(me["path"]))
-    name = input("输入名字:").strip() or "无名氏"
-    db.save_play(name, map_id, me["path"], me["symbol"])
-    print("已记录!按任意键返回…")
+
+    print("\n🎉 Completed! Steps:", len(me["path"]))
+
+    name = input("Enter your name: ").strip() or "Unknown"
+
+    db.save_play(
+        name,
+        map_id,
+        me["path"],
+        me["symbol"]
+    )
+
+    print("Saved! Press any key to return...")
     game.read_key()
 
 
 def vs_game():
-    """双人对战:同图比谁先到出口。两个人的轨迹都存进 plays。"""
+    """Two player mode."""
     map_id = choose_map()
+
     if map_id is None:
         return
-    grid = db.get_map(map_id)
+
+    grid = load_selected_map(map_id)
+
+    if grid is None:
+        return
+
     players = game.make_players(2)
+
     winner = game.play(grid, players)
-    if winner is None:                           # 没人到终点:不记
-        print("\n没人到终点。按任意键返回…")
+
+    if winner is None:
+        print("\nNobody reached the exit.")
         game.read_key()
         return
-    # 只有赢家(先到出口)通关,让赢家输名字并记录
-    print("\n🏆 %s 赢了!用了 %d 步。" % (winner["label"], len(winner["path"])))
-    name = input("赢家输入名字:").strip() or winner["label"]
-    db.save_play(name, map_id, winner["path"], winner["symbol"])
-    print("已记录!按任意键返回…")
+
+    print(
+        "\n🏆 %s wins! Steps: %d"
+        % (winner["label"], len(winner["path"]))
+    )
+
+    name = input("Winner name: ").strip() or winner["label"]
+
+    db.save_play(
+        name,
+        map_id,
+        winner["path"],
+        winner["symbol"]
+    )
+
+    print("Saved! Press any key to return...")
     game.read_key()
 
 
 def arena_game():
-    """机器人比赛(实时):选图,输入要参赛的 bot 编号(可 1 个、几个),各跑一遍再排名。"""
+    """Bot competition mode."""
     map_id = choose_map()
+
     if map_id is None:
         return
-    grid = db.get_map(map_id)
+
+    grid = load_selected_map(map_id)
+
+    if grid is None:
+        return
 
     game.clear_screen()
-    print("========== 可 参 赛 的 Bot ==========\n")
+
+    print("========== AVAILABLE BOTS ==========\n")
+
     for cls in bots.ALL:
-        print("   %d   %s %s(作者:%s)" % (cls.bot_id, cls.symbol, cls.name, cls.author))
-    print("")
-    raw = input("输入参赛 bot 编号(空格分隔,如 1 2):").split()
+        print(
+            "   %d   %s %s (author:%s)"
+            % (
+                cls.bot_id,
+                cls.symbol,
+                cls.name,
+                cls.author
+            )
+        )
+
+    print()
+
+    raw = input(
+        "Enter bot numbers (example: 1 2 3): "
+    ).split()
 
     bot_list = []
+
     for token in raw:
         if token.isdigit():
             cls = bots.by_id(int(token))
+
             if cls is not None:
-                bot_list.append(cls())            # 建一个新实例参赛
+                bot_list.append(cls())
+
     if len(bot_list) == 0:
-        print("没选到 bot。按任意键返回…")
+        print("No bots selected.")
         game.read_key()
         return
 
     max_steps = len(grid) * len(grid[0]) * 5
-    arena.run(grid, map_id, bot_list, config.BOT_STEP_DELAY, max_steps)
+
+    arena.run(
+        grid,
+        map_id,
+        bot_list,
+        config.BOT_STEP_DELAY,
+        max_steps
+    )
 
 
 def replay_game():
-    """看录像:输入交易 id(可多个)。播放中按 1/2/3/4 调倍速,Q 退出。"""
+    """Replay saved games."""
     game.clear_screen()
-    print("========== 看 录 像 ==========\n")
-    print("(交易 id 在排行榜、或比赛结束时都能看到)\n")
-    raw = input("输入要回放的交易 id(可多个,空格分隔):").split()
+
+    print("========== REPLAY ==========\n")
+
+    raw = input(
+        "Enter replay IDs: "
+    ).split()
+
     play_ids = []
+
     for token in raw:
         if token.isdigit():
             play_ids.append(int(token))
+
     if len(play_ids) == 0:
         return
+
     replay.replay(play_ids)
 
 
 def show_leaderboard():
-    """排行榜:按地图分组、步数从少到多(每图前 10)。带交易 id,可照着去看录像。"""
+    """Display leaderboard."""
     game.clear_screen()
-    print("========== 排 行 榜(每图前10)==========\n")
+
+    print("========== LEADERBOARD ==========\n")
+
     rows = db.leaderboard()
+
     if len(rows) == 0:
-        print("还没有记录,快去玩一局!")
+        print("No records yet.")
+
     else:
         current_map = None
         rank = 0
+
         for row in rows:
+
             if row["map_id"] != current_map:
                 current_map = row["map_id"]
                 rank = 0
-                print("\n-- 地图 #%d --" % current_map)
-            rank = rank + 1
-            # 交易id=#.. 让你知道去"看录像"输入哪个
-            print("  %d. %-8s %3d 步   (交易id #%d)" % (rank, row["name"], row["steps"], row["id"]))
-    print("\n按任意键返回…")
+                print("\n-- Map #%d --" % current_map)
+
+            rank += 1
+
+            print(
+                " %d. %-10s %3d steps (play #%d)"
+                %
+                (
+                    rank,
+                    row["name"],
+                    row["steps"],
+                    row["id"]
+                )
+            )
+
+    print("\nPress any key to return...")
     game.read_key()
 
 
 def run():
-    """主菜单循环:选模式。"""
+    """Main menu loop."""
+
+    # Create maps automatically on first run
+    ensure_maps()
+
     while True:
+
         game.clear_screen()
+
         print("==============================")
-        print("        迷 宫 大 冒 险")
+        print("        MAZE ADVENTURE")
         print("==============================\n")
-        print("   1    Single      单人闯关")
-        print("   2    VS Mode     双人对战")
-        print("   3    Arena       机器人比赛")
-        print("   4    Replay      看录像")
-        print("   5    Leaderboard 排行榜")
-        print("   Q    退出\n")
-        print("请按键选择:")
+
+        print("   1    Single Player")
+        print("   2    VS Mode")
+        print("   3    Arena")
+        print("   4    Replay")
+        print("   5    Leaderboard")
+        print("   Q    Quit\n")
+
+        print("Select option:")
 
         key = game.read_key()
+
         if key == "q":
-            print("拜拜!")
+            print("Bye!")
             return
-        # 任何模式里按 Ctrl+C 都干净地退回菜单(不再报错)
+
         try:
+
             if key == "1":
                 single_game()
+
             elif key == "2":
                 vs_game()
+
             elif key == "3":
                 arena_game()
+
             elif key == "4":
                 replay_game()
+
             elif key == "5":
                 show_leaderboard()
-            # 其它键忽略,重画菜单
+
         except KeyboardInterrupt:
-            print("\n已中断,回到菜单…")
+            print("\nReturned to menu...")

@@ -11,22 +11,49 @@
 
   <div class="menu">
     <h3>玩</h3>
-    <a class="btn" href="/play?mode=single">单人闯关</a>
-    <a class="btn" href="/play?mode=vs">多人对战</a>
+    <div class="row">
+      <label>地图
+        <select id="level">
+          {% for lv, size in sizes.items() %}
+            <option value="{{ lv }}" {% if lv == 3 %}selected{% endif %}>{{ size }}x{{ size }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <a class="btn" href="#" onclick="go('/play?mode=single')">单人闯关</a>
+      <a class="btn" href="#" onclick="go('/play?mode=vs')">多人对战</a>
+    </div>
 
     <h3>看机器人跑</h3>
-    {% for b in bots %}
-      <a class="btn" href="/bot?id={{ b.id }}">{{ b.name }}(作者:{{ b.author }})</a>
-    {% endfor %}
-
-    <h3>看录像(数据库里存的对局)</h3>
-    {% if plays %}
-      {% for p in plays %}
-        <a class="btn" href="/replay?id={{ p.id }}">#{{ p.id }} {{ p.name }} · 地图{{ p.map_id }} · {{ p.steps }}步</a>
+    <div class="row">
+      {% for b in bots %}
+        <a class="btn" href="#" onclick="go('/bot?id={{ b.id }}')">{{ b.name }} · {{ b.author }}</a>
       {% endfor %}
+    </div>
+
+    <h3>看录像</h3>
+    {% if plays %}
+      <table class="plays">
+        <tr><th>交易</th><th>玩家</th><th>地图</th><th>步数</th><th></th></tr>
+        {% for p in plays %}
+        <tr>
+          <td>#{{ p.id }}</td>
+          <td>{{ p.name }}</td>
+          <td>{{ p.size }}</td>
+          <td>{{ p.steps }}</td>
+          <td><a href="/replay?id={{ p.id }}">▶ 回放</a></td>
+        </tr>
+        {% endfor %}
+      </table>
     {% else %}
-      <p class="keys">还没有录像。去终端玩几局 / 跑一场比赛(arena)就有了。</p>
+      <p class="keys">还没有录像,赢一局就有了。</p>
     {% endif %}
   </div>
+
+<script>
+  // 带上下拉里选的地图大小(玩 和 看bot 都用它)
+  function go(url) {
+    location = url + '&level=' + document.getElementById('level').value;
+  }
+</script>
 </body>
 </html>

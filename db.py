@@ -176,6 +176,7 @@ def leaderboard(top=10):
             "id": play.id,
             "map_id": play.map_id,
             "name": play.player.name,
+            "size": "%dx%d" % (play.map.width, play.map.height),   # 地图大小(列表显示用)
             "steps": play.steps(),
         })
     session.close()
