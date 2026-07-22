@@ -1,7 +1,8 @@
 # bots/base.py —— 所有 bot 的"基类"(被动式)。
 #
 # 每回合,游戏根据你的坐标现算四邻,递给你一份 status:
-#   {'up':'path'/'wall', 'down':.., 'left':.., 'right':.., 'pos':(x,y)}
+#   {'up':'path'/'wall', 'down':.., 'left':.., 'right':.., 'pos':(x,y), 'moved':1/0}
+#   (moved = 你上一步走没走成:1=走了 0=撞墙没动 "-"=第一回合)
 # 你只需要实现 go_to_exit(self, status):看一眼 status,返回要走的方向
 # ('up'/'down'/'left'/'right')。走这一步(包括撞墙不动)由游戏执行。
 #

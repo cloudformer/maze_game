@@ -80,6 +80,7 @@ def run_bot(grid, bot):
     while turns < limit and (runner["x"], runner["y"]) != exit_pos:
         status = maze.look(grid, runner["x"], runner["y"])
         status["pos"] = (runner["x"], runner["y"])
+        status["moved"] = runner["moved"]    # 上一步走没走成:1走了 0撞墙 -还没走过
         direction = bot.go_to_exit(status)
         if direction in maze.MOVES:
             game.step(grid, runner, direction)

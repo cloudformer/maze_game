@@ -187,12 +187,14 @@ def watch_bot(grid, bot, delay, max_steps):
 
     while turns < max_steps:
         clear_screen()
+        # 最上面:谁在走、当前步数
+        print("%s(作者:%s)   步数:%d" % (bot.name, bot.author, len(runner["path"])))
         draw(grid, [runner])
         # 这一回合递给 bot 的 status(按它坐标现算的四邻)
         status = maze.look(grid, runner["x"], runner["y"])
         status["pos"] = (runner["x"], runner["y"])
-        print("\n%s(作者:%s) 第 %d 步" % (bot.name, bot.author, turns))
-        print("go_to_exit 收到 status =", status, " moved=%s" % runner["moved"])
+        status["moved"] = runner["moved"]    # 上一步走没走成:1走了 0撞墙 -还没走过
+        print("\ngo_to_exit 收到 status =", status)
         print("(据此决定往哪走;Ctrl+C 退出)")
 
         if (runner["x"], runner["y"]) == exit_pos:

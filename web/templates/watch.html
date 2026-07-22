@@ -61,6 +61,7 @@
     });
     out.textContent = lines.join('\n');
     i = i + 1;
+    msg.textContent = '步数 ' + i + ' / ' + maxLen;   // 最上面实时显示当前步数
     // 每帧停顿 = 0.2秒 ÷ 下拉倍速,每帧重新读 -> 一改立即生效
     setTimeout(step, BASE / Number(document.getElementById('speed').value));
   }

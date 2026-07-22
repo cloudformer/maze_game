@@ -36,6 +36,11 @@ def replay(play_ids):
     frame = 0
     while frame <= total:
         game.clear_screen()
+        # 最上面:当前步数 + 每条录像是谁、共几步
+        labels = []
+        for one in runs:
+            labels.append("%s %s(%d步)" % (one["symbol"], one["name"], len(one["path"])))
+        print("回放 步数 %d/%d    " % (frame, total) + "   ".join(labels))
         drawables = []
         for one in runs:
             path = one["path"]
@@ -47,11 +52,6 @@ def replay(play_ids):
                 x, y = path[-1]             # 短轨迹走完了,停在终点
             drawables.append({"symbol": one["symbol"], "x": x, "y": y})
         game.draw(grid, drawables)
-
-        labels = []
-        for one in runs:
-            labels.append("%s %s(%d步)" % (one["symbol"], one["name"], len(one["path"])))
-        print("\n回放 第 %d/%d 帧    " % (frame, total) + "   ".join(labels))
 
         # 倍速条:当前选中的标 *,如  [*1x] [ 2x] [ 5x] [ 10x]
         bar = ""
