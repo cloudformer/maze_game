@@ -158,17 +158,38 @@ def vs_game():
     game.read_key()
 
 
+def choose_size():
+    """Let the player pick a maze size (from config.MAP_SIZES)."""
+    while True:
+        game.clear_screen()
+
+        print("========== MAZE SIZE ==========\n")
+
+        for level, size in config.MAP_SIZES.items():
+            print("   %d    %dx%d" % (level, size, size))
+
+        print("\nPress a number key, B to go back:")
+
+        key = game.read_key()
+
+        if key == "b":
+            return None
+
+        if key.isdigit() and int(key) in config.MAP_SIZES:
+            return config.MAP_SIZES[int(key)]
+
+
 def arena_game():
-    """Bot competition mode."""
-    map_id = choose_map()
+    """Bot competition mode. A NEW maze is generated for every match."""
+    size = choose_size()
 
-    if map_id is None:
+    if size is None:
         return
 
-    grid = load_selected_map(map_id)
+    grid = mazegen.generate(size, size)
 
-    if grid is None:
-        return
+    # Save the fresh maze so plays can be replayed later
+    map_id = db.save_map(size, size, grid)
 
     game.clear_screen()
 

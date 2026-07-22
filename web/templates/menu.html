@@ -23,11 +23,12 @@
       <a class="btn" href="#" onclick="go('/play?mode=vs')">多人对战</a>
     </div>
 
-    <h3>看机器人跑</h3>
+    <h3>机器人比赛(勾选参赛的,只跑勾中的)</h3>
     <div class="row">
       {% for b in bots %}
-        <a class="btn" href="#" onclick="go('/bot?id={{ b.id }}')">{{ b.name }} · {{ b.author }}</a>
+        <label class="chk"><input type="checkbox" class="botchk" value="{{ b.id }}"> {{ b.name }} · {{ b.author }}</label>
       {% endfor %}
+      <a class="btn" href="#" onclick="runBots()">开跑 ▶</a>
     </div>
 
     <h3>看录像</h3>
@@ -50,9 +51,15 @@
   </div>
 
 <script>
-  // 带上下拉里选的地图大小(玩 和 看bot 都用它)
+  // 带上下拉里选的地图大小(玩 和 机器人比赛 都用它)
   function go(url) {
     location = url + '&level=' + document.getElementById('level').value;
+  }
+  // 只跑勾选的 bot:收集勾中的编号 -> /bot?ids=1,3
+  function runBots() {
+    const ids = [...document.querySelectorAll('.botchk:checked')].map(c => c.value);
+    if (ids.length === 0) { alert('先勾选至少一个 bot'); return; }
+    go('/bot?ids=' + ids.join(','));
   }
 </script>
 </body>

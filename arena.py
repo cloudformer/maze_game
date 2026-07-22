@@ -11,11 +11,11 @@ def run(grid, map_id, bot_list, delay, max_steps):
     results = []                              # 收集 (bot, 步数);没走出去记 None
     play_ids = []                             # 本场存下来的交易 id
     for bot in bot_list:
-        steps = game.watch_bot(grid, bot, delay, max_steps)   # 看它跑,拿回步数
+        path = game.watch_bot(grid, bot, delay, max_steps)   # 看它跑,拿回轨迹
         # 只记【跑到终点】的(通关才有成绩);超时没出去的不记
-        if steps is not None:
-            play_ids.append(db.save_play(bot.name, map_id, bot.memory, game.fit2(bot.symbol)))
-        results.append((bot, steps))
+        if path is not None:
+            play_ids.append(db.save_play(bot.name, map_id, path, game.fit2(bot.symbol)))
+        results.append((bot, None if path is None else len(path)))
         print("\n按任意键看下一个…")
         game.read_key()
 
