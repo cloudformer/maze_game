@@ -176,31 +176,36 @@ def play(grid, players):
 
 
 def watch_bot(grid, bot, delay, max_steps):
-    """看一个 bot 自己走迷宫(动画)。走到出口返回回合数;太多回合没出去返回 None。
-    分工:游戏把地图和起点交给 bot(塞进 bot._grid/_x/_y),然后一圈圈喊 bot.go_to_exit();
-          bot 在 go_to_exit 里自己用 status()/move() 感知和行走。
-          画面、计时、判断到没到出口、回合上限 —— 都是游戏管。bot 不碰地图。"""
+    """看一个 bot 走迷宫(动画,被动式)。走到出口返回它的轨迹 path;超回合返回 None。
+    分工:游戏管位置和地图 —— 每回合按 bot 坐标算好 status 递给它,
+          bot 只返回一个方向,走这一步(含撞墙不动)由 game.step 执行。
+          bot 手里没有地图,想开上帝视角也没东西可看。"""
     exit_pos = maze.find_exit(grid)
-    bot._grid = grid            # 把地图交给 bot 的"遥控器"(它只经 status/move 用)
-    bot._x = 1                  # 起点由游戏定
-    bot._y = 1
+    # bot 的"棋子"由游戏拿着,和人类玩家一个形状(step 会维护 位置/moved/path)
+    runner = {"symbol": fit2(bot.symbol), "x": 1, "y": 1, "path": [], "moved": "-"}
     turns = 0
 
     while turns < max_steps:
         clear_screen()
-        draw(grid, [{"symbol": fit2(bot.symbol), "x": bot._x, "y": bot._y}])
-        # 打印 bot 这一步收到的 status()(和写 bot 时 self.status() 拿到的一样)
-        print("\n%s(作者:%s) 第 %d 步" % (bot.name, bot.author, turns))
-        print("go_to_exit 收到 status() =", bot.status())
+        # 最上面:谁在走、当前步数
+        print("%s(作者:%s)   步数:%d" % (bot.name, bot.author, len(runner["path"])))
+        draw(grid, [runner])
+        # 这一回合递给 bot 的 status(按它坐标现算的四邻)
+        status = maze.look(grid, runner["x"], runner["y"])
+        status["pos"] = (runner["x"], runner["y"])
+        status["moved"] = runner["moved"]    # 上一步走没走成:1走了 0撞墙 -还没走过
+        print("\ngo_to_exit 收到 status =", status)
         print("(据此决定往哪走;Ctrl+C 退出)")
 
-        if (bot._x, bot._y) == exit_pos:
-            print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, turns))
-            return turns
+        if (runner["x"], runner["y"]) == exit_pos:
+            print("\n🤖 %s 到达终点!用了 %d 步。" % (bot.name, len(runner["path"])))
+            return runner["path"]
 
-        time.sleep(delay)       # 停一下,才看得见动画
-        bot.go_to_exit()        # bot 自己 status()+move(),会更新 bot._x/_y
+        time.sleep(delay)                        # 停一下,才看得见动画
+        direction = bot.go_to_exit(status)       # bot 只说一个方向
+        if direction in maze.MOVES:
+            step(grid, runner, direction)        # 游戏执行(撞墙不动,记 moved/path)
         turns = turns + 1
 
-    print("\n😵 %s 走了 %d 步还没出去(超步数上限)。" % (bot.name, turns))
+    print("\n😵 %s 走了 %d 回合还没出去(超上限)。" % (bot.name, turns))
     return None

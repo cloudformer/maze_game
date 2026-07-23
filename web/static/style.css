@@ -23,13 +23,19 @@ a { color:#9cf; }
 .tank .barrel { position:absolute; left:11px; top:-1px; width:4px; height:12px; border-radius:2px; }
 .p1 .body, .p1 .barrel { background:#e6d84f; }   /* 玩家1 黄坦克 */
 .p2 .body, .p2 .barrel { background:#5ecb5e; }   /* 玩家2 绿坦克 */
-.bot .body, .bot .barrel { background:#5ad0e6; } /* bot / 录像 青坦克 */
+/* bot 比赛 / 录像:按顺序配色 */
+.c0 .body, .c0 .barrel { background:#5ad0e6; }   /* 青 */
+.c1 .body, .c1 .barrel { background:#e6d84f; }   /* 黄 */
+.c2 .body, .c2 .barrel { background:#5ecb5e; }   /* 绿 */
+.c3 .body, .c3 .barrel { background:#e08a3c; }   /* 橙 */
 
 /* 菜单 */
 .menu { max-width:520px; margin:0 auto; text-align:left; }
 .menu h3 { color:#e6d84f; border-bottom:1px solid #333; padding-bottom:4px; margin-top:22px; }
 .menu .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .menu label { color:#888; font-size:14px; }
+.menu .chk { color:#ccc; font-size:14px; background:#1a1a1a; border:1px solid #444;
+             padding:6px 10px; border-radius:6px; cursor:pointer; }
 .btn { display:inline-block; background:#333; color:#ddd; min-width:96px; text-align:center;
        border:1px solid #666; padding:8px 14px; border-radius:6px; cursor:pointer;
        text-decoration:none; font-size:14px; }

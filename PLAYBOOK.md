@@ -86,23 +86,26 @@ python main.py
 
 ## 写自己的机器人
 
-新建 `bots/my_bot.py`:
+新建 `bots/my_bot.py`(被动式:游戏每回合递给你 status,你返回一个方向):
 
 ```python
 from bots.base import Bot
 
 class MyBot(Bot):
+    bot_id = 4            # 编号别和已有的重复
     name = "小明1号"
     author = "小明"
     symbol = "@@"
 
-    def next_move(self, pos, walls):
-        # 可用:self.open_directions(walls) / self.direction / self.memory
-        return self.open_directions(walls)[0]   # ← 换成你的策略
+    def go_to_exit(self, status):
+        # status = {'up':'path'/'wall', 'down':.., 'left':.., 'right':.., 'pos':(x,y)}
+        if status["down"] == "path":
+            return "down"          # ← 换成你的策略,返回 'up'/'down'/'left'/'right'
+        return "right"
 ```
 
-再到 `bots/__init__.py` 加一行 `from bots.my_bot import MyBot`。
-规矩:只看 `pos`/`walls` 决策,**不碰地图**。
+再到 `bots/__init__.py`:`from bots.my_bot import MyBot`,并把 `MyBot` 加进 `ALL`。
+公平是结构保证的:bot 手里没有地图,只能看到游戏递来的 status。
 
 ---
 

@@ -71,17 +71,21 @@ def frames_of(grid, path):
 
 
 def run_bot(grid, bot):
-    """在 web 里把一个 bot 跑完,返回它走过的轨迹 path(只跑不画,画交给浏览器)。
-    就几行:复用 bots + maze,不碰 game.py。"""
-    bot._grid = grid
-    bot._x, bot._y = 1, 1
+    """在 web 里把一个 bot 跑完(被动式),返回轨迹 path(只跑不画,画交给浏览器)。
+    和终端同一套:游戏算 status 递给 bot,bot 还方向,game.step 执行。"""
+    runner = {"x": 1, "y": 1, "path": [], "moved": "-"}
     exit_pos = maze.find_exit(grid)
     limit = len(grid) * len(grid[0]) * 5
     turns = 0
-    while turns < limit and (bot._x, bot._y) != exit_pos:
-        bot.go_to_exit()
+    while turns < limit and (runner["x"], runner["y"]) != exit_pos:
+        status = maze.look(grid, runner["x"], runner["y"])
+        status["pos"] = (runner["x"], runner["y"])
+        status["moved"] = runner["moved"]    # 上一步走没走成:1走了 0撞墙 -还没走过
+        direction = bot.go_to_exit(status)
+        if direction in maze.MOVES:
+            game.step(grid, runner, direction)
         turns = turns + 1
-    return bot.memory        # [[x,y], ...] 走过的位置
+    return runner["path"]
 
 
 # ---------------- 菜单 ----------------
@@ -145,15 +149,24 @@ def save():
 # ---------------- Bot:现场跑一个 bot,浏览器动画 ----------------
 @app.route("/bot")
 def bot_page():
-    bot_id = int(request.args.get("id", "1"))
-    cls = bots.by_id(bot_id)
+    """只跑勾选的 bot(?ids=1,3):同一张新图上各跑一遍,一起动画、比步数。"""
     size = chosen_size()
     grid = mazegen.generate(size, size)
-    path = run_bot(grid, cls())
-    title = "%s(作者:%s)跑迷宫 —— %d 步" % (cls.name, cls.author, len(path))
+
+    runs = []
+    for token in request.args.get("ids", "").split(","):
+        if token.isdigit() and bots.by_id(int(token)) is not None:
+            cls = bots.by_id(int(token))
+            path = run_bot(grid, cls())
+            runs.append({"name": cls.name, "author": cls.author,
+                         "steps": len(path), "frames": frames_of(grid, path)})
+
+    if len(runs) == 1:
+        title = "%s(作者:%s)—— %d 步" % (runs[0]["name"], runs[0]["author"], runs[0]["steps"])
+    else:
+        title = "机器人比赛(%d 名选手)" % len(runs)
     return render_template("watch.html", cells=cell_types(grid), title=title,
-                           frames=frames_of(grid, path),
-                           base=int(config.BOT_STEP_DELAY * 1000))
+                           runs=runs, base=int(config.BOT_STEP_DELAY * 1000))
 
 
 # ---------------- 录像:回放数据库里存的一局 ----------------
@@ -163,9 +176,10 @@ def replay_page():
     one = db.get_play(play_id)
     grid = db.get_map(one["map_id"])
     title = "回放 #%d —— %s,%d 步" % (play_id, one["name"], len(one["path"]))
+    runs = [{"name": one["name"], "author": "", "steps": len(one["path"]),
+             "frames": frames_of(grid, one["path"])}]
     return render_template("watch.html", cells=cell_types(grid), title=title,
-                           frames=frames_of(grid, one["path"]),
-                           base=int(config.BOT_STEP_DELAY * 1000))
+                           runs=runs, base=int(config.BOT_STEP_DELAY * 1000))
 
 
 if __name__ == "__main__":

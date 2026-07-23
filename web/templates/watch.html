@@ -12,7 +12,9 @@
 
   <div id="maze" style="grid-template-columns: repeat({{ cells[0]|length }}, var(--cell));">
     {% for row in cells %}{% for c in row %}<div class="cell {{ c }}">{% if c == 'exit' %}🏁{% endif %}</div>{% endfor %}{% endfor %}
-    <div id="tank" class="tank bot"><div class="body"></div><div class="barrel"></div></div>
+    {% for r in runs %}
+    <div id="tk{{ loop.index0 }}" class="tank c{{ loop.index0 % 4 }}"><div class="body"></div><div class="barrel"></div></div>
+    {% endfor %}
   </div>
 
   <p>
@@ -32,27 +34,35 @@
 <script>
   const CELL = 26;
   const BASE = {{ base }};                // 标准每帧毫秒数,来自 config.BOT_STEP_DELAY(两端同源)
-  const FRAMES = {{ frames | tojson }};   // [{dir, moved, status:{...,pos}}, ...]
-  const tank = document.getElementById('tank');
+  const RUNS = {{ runs | tojson }};       // 每条:{name, steps, frames:[{dir,moved,status:{..,pos}}]}
   const msg = document.getElementById('msg');
   const out = document.getElementById('out');
   const ROT = { up:0, right:90, down:180, left:270 };
+  const tanks = RUNS.map((r, k) => document.getElementById('tk' + k));
 
-  function place(x, y) { tank.style.left = (x*CELL)+'px'; tank.style.top = (y*CELL)+'px'; }
-  place(1, 1);                            // 起点
+  function place(el, x, y) { el.style.left = (x*CELL)+'px'; el.style.top = (y*CELL)+'px'; }
+  tanks.forEach(t => place(t, 1, 1));     // 都从起点出发
 
   let i = 0;
+  const maxLen = Math.max(...RUNS.map(r => r.frames.length));
   function step() {
-    if (i >= FRAMES.length) {
-      msg.textContent = '🏁 到达终点!共 ' + FRAMES.length + ' 步';
+    if (i >= maxLen) {                    // 全部放完:按步数排名
+      const rank = RUNS.slice().sort((a, b) => a.steps - b.steps)
+        .map((r, k) => (k+1) + '. ' + r.name + ' ' + r.steps + '步').join('　');
+      msg.textContent = '🏁 ' + rank;
       return;
     }
-    const f = FRAMES[i];
-    tank.style.transform = 'rotate(' + ROT[f.dir] + 'deg)';
-    place(f.status.pos[0], f.status.pos[1]);
-    out.textContent = JSON.stringify(f);   // 显示这一步的 status
+    const lines = [];
+    RUNS.forEach((r, k) => {
+      const f = r.frames[Math.min(i, r.frames.length - 1)];  // 走完的停在终点
+      tanks[k].style.transform = 'rotate(' + ROT[f.dir] + 'deg)';
+      place(tanks[k], f.status.pos[0], f.status.pos[1]);
+      lines.push(r.name + ' ' + JSON.stringify(f));
+    });
+    out.textContent = lines.join('\n');
     i = i + 1;
-    // 每帧停顿 = 0.2秒 ÷ 下拉选的倍速 —— 每帧都重新读,一改立即生效
+    msg.textContent = '步数 ' + i + ' / ' + maxLen;   // 最上面实时显示当前步数
+    // 每帧停顿 = 0.2秒 ÷ 下拉倍速,每帧重新读 -> 一改立即生效
     setTimeout(step, BASE / Number(document.getElementById('speed').value));
   }
   setTimeout(step, BASE);
