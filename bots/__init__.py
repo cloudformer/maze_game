@@ -4,13 +4,14 @@
 from bots.sample1 import Sample1
 from bots.sample2 import Sample2
 from bots.sample3_pro import SmartBot
-
+from bots.sample4_no_cheat import Sample4
 
 # All bots available for Arena
 ALL = [
     Sample1,
     Sample2,
-    SmartBot
+    SmartBot,
+    Sample4
 ]
 
 

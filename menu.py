@@ -188,7 +188,7 @@ def arena_game():
     print()
 
     raw = input(
-        "Enter bot numbers (example: 1 2 3): "
+        "Enter bot numbers (example: 1 2 3 4): "
     ).split()
 
     bot_list = []
